@@ -37,7 +37,7 @@ CHUNK_OVERLAP = 200
 COLLECTION_PDF = "pdf-collection"
 COLLECTION_NONPDF = "nonpdf-collection"
 
-## Embedding models used
+## Embedding model used
 HF_EMBEDDINGS = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
 ## Prompt templates:

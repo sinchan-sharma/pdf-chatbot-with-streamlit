@@ -6,23 +6,26 @@ from langchain_chroma import Chroma
 from langchain_community.document_loaders import PyPDFLoader
 from config import VECTOR_DB_DIR, CHUNK_SIZE, CHUNK_OVERLAP, HF_EMBEDDINGS
 
-# File that stores the hash of the last processed PDF file
+## File that stores the hash of the last processed PDF file
 METADATA_FILE = os.path.join(VECTOR_DB_DIR, "last_file.txt")
 
 ## Clear the contents of the vector store before rebuilding
+## This is only necessary if a new PDF file is uploaded during the same session
 def clear_vectorstore(path):
     """
-    Clear the vector store directory.
+    Clear the vector store directory. This ensures that there's no leftover data
+    from a previous document that could pollute the new vector store.
     """
     if os.path.exists(path):
         shutil.rmtree(path)
         print(f"Cleared vector store at: {path}")
 
-
-# Helper to generate a hash for the uploaded file's contents
+## Helper to generate a hash for the uploaded file's contents
+## This is to avoid rebuilding the vector store if the uploaded PDF file hasn't changed
 def get_file_hash(file_path):
     """
     Generate a hash of the file contents to detect if the file has changed.
+    This helps to avoid rebuilding the vector store if the uploaded PDF file hasn't changed.
     """
     hasher = hashlib.md5()
     with open(file_path, "rb") as f:
