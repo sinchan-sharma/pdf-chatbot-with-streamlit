@@ -1,7 +1,6 @@
-from typing import Optional
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.memory import ConversationBufferMemory
-from langchain_core.runnables import RunnableSequence, Runnable, RunnableLambda
+from langchain_core.runnables import RunnableSequence, RunnableLambda
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_core.output_parsers import StrOutputParser
 from langchain_groq import ChatGroq
@@ -9,7 +8,10 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_ollama import OllamaLLM
 
 from config import INSTRUCTIONS, QUESTION_CLASSIFIER_PROMPT, GROQ_API_KEY, GOOGLE_API_KEY
-import traceback
+from logger import get_logger
+
+## Initialize a logger for logging purposes
+logger = get_logger()
 
 class ConversationalRAG:
     """
@@ -32,11 +34,17 @@ class ConversationalRAG:
         ])
         self.status_callback = status_callback or (lambda msg: None) # fallback to no-op
 
-    def log(self, msg: str):
-        """Log message to both callback and stdout (optional)."""
+    def log(self, msg: str, level: str = "info"):
+        """Log messages to both Streamlit UI via a status callback and file via a logger."""
         self.status_callback(msg)
-        print(msg) # This line is optionalif the user wants a cleaner terminal output
-                   # This does not affect the Streamlit UI
+        if level == "debug":
+            logger.debug(msg)
+        elif level == "warning":
+            logger.warning(msg)
+        elif level == "error":
+            logger.error(msg)
+        else:
+            logger.info(msg)
 
     # LLM selection
     def _get_llm(self, name): 
@@ -52,72 +60,82 @@ class ConversationalRAG:
         raise ValueError(f"Unsupported model choice: '{name}'. Use 'Ollama' 'Gemini', or 'Groq'.")
 
     # Question classification as 'Factual' or 'Interpretive'
-    def _classify(self, query):
+    def _classify(self, query) -> str:
         """
         Uses the LLM to classify a question/query as 'Factual' or 'Interpretive'
         """
         try: 
-            return (QUESTION_CLASSIFIER_PROMPT | self.llm | StrOutputParser()).invoke({"query": query}).strip()
+            question_type = (QUESTION_CLASSIFIER_PROMPT | self.llm | StrOutputParser()).invoke({"query": query}).strip()
+            self.log(f"Classified query as: {question_type}", level="info")
+            return question_type
         except Exception as e: 
-            self.log(f"An error occurred during question classification: {e}")
+            self.log(f"Error during question classification: {e}", level="error")
+            logger.exception(f"Classification error: {e}")
             return "Interpretive"
 
     # Format retrieved documents/chunks as a single string to pass to the LLM
-    def _format_docs(self, docs):
+    def _format_docs(self, docs) -> str:
         """
         Join retrieved documents/chunks as a single string of context to pass
         to the LLM.
         """
         if not docs:
-            self.log("No documents to format.")
+            self.log("No documents to format.", level="warning")
             return "Warning: No relevant context was found."
         
         # Check document types and contents for debugging purposes (this is optional)
         for i, doc in enumerate(docs):
             if not hasattr(doc, "page_content"):
-                self.log(f"Document at index {i} missing 'page_content'. Actual type: {type(doc)}")
+                self.log(f"Document at index {i} missing 'page_content'. Actual type: {type(doc)}", level="warning")
             elif not isinstance(doc.page_content, str):
-                self.log(f"Document page_content at index {i} is not a string. Type: {type(doc.page_content)}")
+                self.log(f"Document page_content at index {i} is not a string. Type: {type(doc.page_content)}", level="warning")
 
         try:
             formatted = "\n\n".join(doc.page_content for doc in docs if hasattr(doc, "page_content"))
+            if not formatted.strip():
+                self.log("Formatted document string is empty.", level="warning")
+                return "Warning: no relevant context was found."
             return formatted
         except Exception as e:
-            self.log(f"[ERROR] Exception in _format_docs: {e}")
-            traceback.print_exc()
+            self.log("Error formatting document contents.", level="error")
+            logger.exception(f"Error formatting document contents: {e}")
             return "Warning: Error formatting document contents."
 
     # Build the RAG chain
-    def _build_chain(self, retriever, query, question_type: str):
+    def _build_chain(self, retriever, query, question_type: str) -> RunnableWithMessageHistory:
         """
         Build the RAG chain with memory, instructions, retrieved context, and
         the chosen LLM.
         """
-        # Have the LLM infer the question/query type
-        question_type = self._classify(query)
         # Get instruction text for this question type, defaulting to "Interpretive"
         instruction = INSTRUCTIONS.get(question_type, INSTRUCTIONS["Interpretive"])
         # Load chat history from memory
         chat_history = self.memory.load_memory_variables({}).get("chat_history", [])
 
         # Messages for Streamlit UI to display while a response is being generated by the LLM
-        self.log(f"Classified query as: {question_type}")
-        self.log(f"Building chain with question_type: {question_type}")
-        self.log(f"Instruction text length: {len(instruction)}")
-        self.log(f"Number of chat history messages: {len(chat_history)}")
+        self.log(f"Building chain with question_type: {question_type}", level="info")
+        self.log(f"Instruction text length: {len(instruction)}", level="debug")
+        self.log(f"Number of chat history messages between user and AI: {len(chat_history)}", level="debug")
 
         # Retrieve relevant documents from the retriever
-        docs = retriever.get_relevant_documents(query)
-        self.log(f"Retrieved {len(docs)} docs.")
-        
+        try:
+            docs = retriever.get_relevant_documents(query)
+            self.log(f"Retrieved {len(docs)} docs.", level="info")
+        except Exception as e:
+            self.log(f"Failed to retrieve documents: {e}", level="error")
+            logger.exception(f"Retrieval error: {e}")
+            docs = [] # Set retrieved docs to an empty list if an error occurs during retrieval
+
         context_str = self._format_docs(docs)
-        self.log(f"Context string length: {len(context_str)}")
+        self.log(f"Context string length: {len(context_str)}", level="debug")
 
         # Prompt inputs prepared separately for clarity
         prompt_inputs = {"instruction": instruction, "context": context_str,
                          "question": query, "chat_history": chat_history}
 
-        # Build chain using a Runnable over the entire prompt_inputs dictionary
+        # Wrap prompt_inputs in RunnableLambda to create a Runnable that outputs the full
+        # prompt dictionary, which then gets passed through the prompt template and LLM.
+        # This enables composing the entire prompt pipeline as a single runnable sequence.
         chain = (
             RunnableLambda(lambda _: prompt_inputs) 
             | self.template 
@@ -133,12 +151,11 @@ class ConversationalRAG:
                     )
 
     # Run the full pipeline
-    def conversational_chat(self, query: str, k: int = 5):
+    def conversational_chat(self, query: str, k: int = 5) -> str:
         """
         Run the full conversational RAG pipeline and return the model's response
         """
-        # print(f"conversational_chat called with query='{query}' and k={k}")
-        self.log(f"Received query: '{query}'")
+        self.log(f"Received query: '{query}'", level="info")
 
         # Have the LLM infer the question/query type, then build the chain
         question_type = self._classify(query)
@@ -146,15 +163,15 @@ class ConversationalRAG:
         chain = self._build_chain(retriever, query, question_type)
 
         try:
-            self.log("Invoking LLM chain...")
+            self.log("Invoking LLM chain...", level="debug")
             # Invoke the LLM chain and try to generate a response for the user query
             response = chain.invoke({"question": query}, 
                                      config={"configurable": {"session_id": "default"}})
-            self.log("LLM response received successfully.")
+            self.log("LLM response received successfully.", level="info")
         except Exception as e:
-            print(f"[ERROR] Exception during chain.invoke: {e}")
-            traceback.print_exc()
-            response = f"An error occurred while processing your query: {e}"
+            self.log("Error during LLM chain execution.", level="error")
+            logger.exception(f"Error during chain.invoke: {e}")
+            response = "An error occurred while processing your query"
 
         return response
 
