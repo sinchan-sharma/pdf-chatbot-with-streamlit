@@ -69,13 +69,27 @@ def main():
             memory.chat_memory.add_ai_message(message)
 
     # Status callbacks for Streamlit UI
-    log_messages = []
+    ui_log_messages = []
     status_box = st.empty()
 
-    def update_status(msg):
-        log_messages.append(msg)
-        status_box.code("\n".join(log_messages), language="text")
-        logger.info(msg)
+    def log_status(msg, level: str = "info", print_to_ui: bool = False):
+        """
+        Logs a message to both the log file and the Streamlit UI status box.
+        """
+        # Skip printing a message to the Streamlit UI unless specified
+        if print_to_ui:
+            ui_log_messages.append(msg)
+            status_box.code("\n".join(ui_log_messages), language="text")
+
+        # Log to file
+        if level == "debug":
+            logger.debug(msg)
+        elif level == "warning":
+            logger.warning(msg)
+        elif level == "error":
+            logger.error(msg)
+        else:
+            logger.info(msg)        
 
     # Only proceed if a file is uploaded
     if uploaded_file:
@@ -121,7 +135,7 @@ def main():
         rag = ConversationalRAG(pdf_store=vector_store, 
                                 model_choice=model_choice,
                                 memory=memory, 
-                                status_callback=update_status)
+                                status_callback=log_status)
     except Exception as e:
         logger.exception(f"Failed to initialize ConversationalRAG: {e}")
         st.error("An error occurred while initializing the chatbot.")
@@ -140,8 +154,8 @@ def main():
     query = st.chat_input("Ask a question about your document:")
 
     if query:
-        log_messages.clear() # Clear previous logs
-        update_status(f"User query received: {query}")
+        ui_log_messages.clear() # Clear previous logs
+        log_status(f"User query received: {query}", print_to_ui=True)
 
         with st.spinner("Thinking..."):
             try:

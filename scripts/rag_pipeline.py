@@ -34,17 +34,9 @@ class ConversationalRAG:
         ])
         self.status_callback = status_callback or (lambda msg: None) # fallback to no-op
 
-    def log(self, msg: str, level: str = "info"):
+    def log(self, msg: str, level: str = "info", print_to_ui: bool = False):
         """Log messages to both Streamlit UI via a status callback and file via a logger."""
-        self.status_callback(msg)
-        if level == "debug":
-            logger.debug(msg)
-        elif level == "warning":
-            logger.warning(msg)
-        elif level == "error":
-            logger.error(msg)
-        else:
-            logger.info(msg)
+        self.status_callback(msg, level, print_to_ui)
 
     # LLM selection
     def _get_llm(self, name): 
@@ -120,7 +112,7 @@ class ConversationalRAG:
         # Retrieve relevant documents from the retriever
         try:
             docs = retriever.get_relevant_documents(query)
-            self.log(f"Retrieved {len(docs)} docs.", level="info")
+            self.log(f"Retrieved {len(docs)} relevant documents.", level="info", print_to_ui=True)
         except Exception as e:
             self.log(f"Failed to retrieve documents: {e}", level="error")
             logger.exception(f"Retrieval error: {e}")
@@ -155,7 +147,7 @@ class ConversationalRAG:
         """
         Run the full conversational RAG pipeline and return the model's response
         """
-        self.log(f"Received query: '{query}'", level="info")
+        # self.log(f"Received query: '{query}'", level="info")
 
         # Have the LLM infer the question/query type, then build the chain
         question_type = self._classify(query)
@@ -163,11 +155,11 @@ class ConversationalRAG:
         chain = self._build_chain(retriever, query, question_type)
 
         try:
-            self.log("Invoking LLM chain...", level="debug")
+            self.log("Invoking LLM chain...", level="debug", print_to_ui=True)
             # Invoke the LLM chain and try to generate a response for the user query
             response = chain.invoke({"question": query}, 
                                      config={"configurable": {"session_id": "default"}})
-            self.log("LLM response received successfully.", level="info")
+            self.log("LLM response received successfully.", level="info", print_to_ui=True)
         except Exception as e:
             self.log("Error during LLM chain execution.", level="error")
             logger.exception(f"Error during chain.invoke: {e}")
