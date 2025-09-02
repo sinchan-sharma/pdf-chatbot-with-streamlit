@@ -1,33 +1,48 @@
 import logging
 import os
+import streamlit as st
 
-log_dir = "logs"
-os.makedirs(log_dir, exist_ok=True)
+LOG_DIR = "logs"
+LOG_FILE_NAME = "pdf_rag.log"
+LOGGER_NAME = "pdf_rag"
 
-name = "pdf_rag"
-logger = logging.getLogger(name)
-logger.setLevel(logging.DEBUG)  # or INFO in production
-
-# Prevent adding multiple handlers during Streamlit reruns
-# This prevents the same outputs from showing up repeatedly in the terminal
-if not logger.hasHandlers():
-    # Console handler
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.INFO)
-
-    # File handler
-    fh = logging.FileHandler(f"{log_dir}/{name}.log", mode="w")
-    fh.setLevel(logging.DEBUG)
-
-    # Formatter
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-    ch.setFormatter(formatter)
-    fh.setFormatter(formatter)
-
-    logger.addHandler(ch)
-    logger.addHandler(fh)
+os.makedirs(LOG_DIR, exist_ok=True)
+LOG_FILE_PATH = os.path.join(LOG_DIR, LOG_FILE_NAME)
 
 def get_logger():
+    logger = logging.getLogger(LOGGER_NAME)
+    logger.setLevel(logging.DEBUG)
+
+    # Prevent log propagation to root logger (avoids double-logging)
+    logger.propagate = False
+
+    # Only configure handlers once (per Python process)
+    if not logger.handlers:
+
+        # Clear log file ONCE per Streamlit session
+        if "log_initialized" not in st.session_state:
+            with open(LOG_FILE_PATH, "w"):
+                pass  # Just clear contents
+            st.session_state["log_initialized"] = True
+
+        # Console handler
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.INFO)
+
+        # File handler
+        fh = logging.FileHandler(LOG_FILE_PATH, mode="a")
+        fh.setLevel(logging.DEBUG)
+
+        # Formatter
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
+        ch.setFormatter(formatter)
+        fh.setFormatter(formatter)
+
+        # Add handlers
+        logger.addHandler(ch)
+        logger.addHandler(fh)
+
     return logger
+
