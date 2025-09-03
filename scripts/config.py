@@ -1,11 +1,12 @@
-## General Imports
 import os
 from dotenv import load_dotenv
-## Prompt Templates
 from langchain_core.prompts import PromptTemplate
-## Embedding Models
 from langchain_huggingface import HuggingFaceEmbeddings
 
+from logger import get_logger
+
+## Initialize a logger for logging purposes
+logger =  get_logger()
 
 ## Load environment variables
 load_dotenv()
@@ -19,19 +20,20 @@ LANGSMITH_ENDPOINT = os.getenv("LANGSMITH_ENDPOINT")
 
 ## Check whether user has necessary API keys set up in their environment
 if not GOOGLE_API_KEY or not GROQ_API_KEY:
+    logger.error("Missing API keys for Google and/or Groq.")
     raise ValueError("Please ensure both GOOGLE_API_KEY and GROQ_API_KEY are set up in your .env file.")
 
 ## Check that LangSmith API key is properly set up
 if not LANGSMITH_API_KEY:
-    print("Warning: LangSmith API key is not set. LangSmith features will not work.")
+    logger.warning("Warning: LangSmith API key is not set. LangSmith features will not work.")
 
 ## Check for LangSmith tracing
 if LANGSMITH_API_KEY and not LANGSMITH_TRACING:
-    print("Warning: LangSmith tracing is not enabled. This may affect tracing-related features.")
+    logger.warning("Warning: LangSmith tracing is not enabled. This may affect tracing-related features.")
 
 ## Constants
-DOCUMENTS_FOLDER = "./documents"
-VECTOR_DB_DIR = "./chroma_db"
+DOCUMENTS_FOLDER = os.path.join(".", "documents")
+VECTOR_DB_DIR = os.path.join(".", "chroma_db")
 CHUNK_SIZE = 800
 CHUNK_OVERLAP = 200
 COLLECTION_PDF = "pdf-collection"
@@ -40,8 +42,8 @@ COLLECTION_NONPDF = "nonpdf-collection"
 ## Embedding model used
 HF_EMBEDDINGS = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
-## Prompt templates:
-## Instructions for dynamic prompting
+## Instructions prompt for dynamic prompting. This is used to dictate how the LLM answers 
+## user questions using different guidelines for different scenarios
 INSTRUCTIONS = {
     "Factual": """
 You are a helpful AI assistant tasked with answering factual questions using the provided context.
@@ -99,7 +101,8 @@ You are a helpful AI assistant tasked with answering factual questions using the
     """
 }
 
-## Classification prompt to detect question type using few-shot examples
+## Classification prompt template used for the LLM to detect question type 
+## using few-shot examples.
 QUESTION_CLASSIFIER_PROMPT = PromptTemplate(
     input_variables=["query"],
     template="""
