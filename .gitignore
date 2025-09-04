@@ -3,3 +3,9 @@ venv/
 __pycache__/
 *.pyc
 logs/
+chroma_db/
+documents/
+extra.py
+main.py
+old_logger_*.py
+sample_streamlit_*.py
