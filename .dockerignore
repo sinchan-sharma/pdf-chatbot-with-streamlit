@@ -1,0 +1,34 @@
+## Bytecode + Python junk
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+## ZIP files + notebooks
+*.zip
+*.ipynb
+
+## Virtual environment
+venv/
+
+## Secrets
+.env
+
+## Git
+.git/
+.gitignore
+
+## Runtime folders
+logs/
+chroma_db/
+documents/
+
+## Additional folders
+sample_documents/
+screenshots/
+
+## Experimental/old code
+extra.py
+main.py
+old_logger_*.py
+sample_streamlit_*.py

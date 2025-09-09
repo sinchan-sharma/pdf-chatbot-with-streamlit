@@ -8,8 +8,9 @@ from logger import get_logger
 ## Initialize a logger for logging purposes
 logger =  get_logger()
 
-## Load environment variables
-load_dotenv()
+## Load environment variables depending on local run or inside Docker
+if os.getenv("RUNNING_IN_DOCKER") != "true":
+    load_dotenv()
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
