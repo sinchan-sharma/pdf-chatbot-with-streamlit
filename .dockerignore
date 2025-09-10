@@ -27,6 +27,9 @@ documents/
 sample_documents/
 screenshots/
 
+## Markdown files
+README.md
+
 ## Experimental/old code
 extra.py
 main.py
