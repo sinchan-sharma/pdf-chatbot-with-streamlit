@@ -9,9 +9,14 @@ from logger import get_logger
 logger =  get_logger()
 
 ## Load environment variables depending on local run or inside Docker
-if os.getenv("RUNNING_IN_DOCKER") != "true":
+## Also controls where logging occurs
+if os.getenv("RUNNING_IN_DOCKER") == "true":
+    logger.info("Running inside Docker - logging to console only.")
+else:
     load_dotenv()
+    logger.info("Running locally - logging to both file and console.")
 
+## Get API keys and other environment variables from .env file
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 LANGSMITH_TRACING = os.getenv("LANGSMITH_TRACING")

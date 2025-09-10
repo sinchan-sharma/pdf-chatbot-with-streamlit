@@ -5,8 +5,6 @@ import streamlit as st
 LOG_DIR = "logs"
 LOG_FILE_NAME = "pdf_rag.log"
 LOGGER_NAME = "pdf_rag"
-
-os.makedirs(LOG_DIR, exist_ok=True)
 LOG_FILE_PATH = os.path.join(LOG_DIR, LOG_FILE_NAME)
 
 def get_logger():
@@ -16,33 +14,35 @@ def get_logger():
     # Prevent log propagation to root logger (avoids double-logging)
     logger.propagate = False
 
-    # Only configure handlers once (per Python process)
-    if not logger.handlers:
+    if logger.handlers:
+        return logger
 
-        # Clear log file ONCE per Streamlit session
+    # Logging formatter
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+
+    # Always add a console handler (for both local runs & inside Docker)
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.DEBUG)
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+
+    # Log to file ONLY if the app is not being run inside Docker
+    if os.getenv("RUNNING_IN_DOCKER") != "true":
+
+        # Create a new folder if it doesn't already exist
+        os.makedirs(LOG_DIR, exist_ok=True)
+
+        # Clear file once per Streamlit session
         if "log_initialized" not in st.session_state:
             with open(LOG_FILE_PATH, "w"):
-                pass  # Just clear contents
+                pass
             st.session_state["log_initialized"] = True
 
-        # Console handler
-        ch = logging.StreamHandler()
-        ch.setLevel(logging.INFO)
-
-        # File handler
         fh = logging.FileHandler(LOG_FILE_PATH, mode="a")
         fh.setLevel(logging.DEBUG)
-
-        # Formatter
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
-        ch.setFormatter(formatter)
         fh.setFormatter(formatter)
-
-        # Add handlers
-        logger.addHandler(ch)
         logger.addHandler(fh)
 
     return logger
-
