@@ -7,7 +7,8 @@ from langchain_groq import ChatGroq
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_ollama import OllamaLLM
 
-from config import INSTRUCTIONS, QUESTION_CLASSIFIER_PROMPT, GROQ_API_KEY, GOOGLE_API_KEY
+from config import (INSTRUCTIONS, QUESTION_CLASSIFIER_PROMPT, GROQ_API_KEY,
+                    GOOGLE_API_KEY, OLLAMA_BASE_URL, RUNNING_IN_DOCKER)
 from logger import get_logger
 
 ## Initialize a logger for logging purposes
@@ -44,10 +45,18 @@ class ConversationalRAG:
         Load the LLM based on the model name (either 'ollama', 'gemini', or 'groq').
         """
         if name == "ollama":
-            return OllamaLLM(model="gemma3", temperature=0.3)
+            # Read OLLAMA_BASE_URL from .env if running in Docker, otherwise use default base_url
+            if RUNNING_IN_DOCKER:
+                logger.info(f"Initializing OllamaLLM with base URL = {OLLAMA_BASE_URL}")
+                return OllamaLLM(model="gemma3", temperature=0.3, base_url=OLLAMA_BASE_URL)
+            else:
+                logger.info("Initializing OllamaLLM with default base URL")
+                return OllamaLLM(model="gemma3", temperature=0.3)
         if name == "groq":
+            logger.info("Initializing ChatGroq")
             return ChatGroq(model="llama-3.1-8b-instant", temperature=0.3, api_key=GROQ_API_KEY)
         if name == "gemini":
+            logger.info("Initializing ChatGoogleGenerativeAI")
             return ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.3, api_key=GOOGLE_API_KEY)
         raise ValueError(f"Unsupported model choice: '{name}'. Use 'Ollama' 'Gemini', or 'Groq'.")
 

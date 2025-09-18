@@ -11,12 +11,15 @@ logger =  get_logger()
 ## Load environment variables depending on local run or inside Docker
 ## Also controls where logging occurs
 if os.getenv("RUNNING_IN_DOCKER") == "true":
+    RUNNING_IN_DOCKER = True
     logger.info("Running inside Docker - logging to console only.")
 else:
+    RUNNING_IN_DOCKER = False
     load_dotenv()
     logger.info("Running locally - logging to both file and console.")
 
 ## Get API keys and other environment variables from .env file
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 LANGSMITH_TRACING = os.getenv("LANGSMITH_TRACING")

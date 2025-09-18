@@ -36,7 +36,6 @@ EXPOSE 8501
 # Command to run the app
 CMD ["streamlit", "run", "scripts/app.py", "--server.port=8501", "--server.address=0.0.0.0"]
 
-
 # Note: to build Docker image, run the following in the terminal:
 # docker build -t streamlit-chatbot . 
 
@@ -50,7 +49,10 @@ CMD ["streamlit", "run", "scripts/app.py", "--server.port=8501", "--server.addre
 # Or if you want to inspect the container after it stops without deleting it:
 # docker run --name streamlit-app -p 8501:8501 --env-file .env streamlit-chatbot
 
-# Running either of the `docker run` commands above will do the following:
+# To add a volume mount for Ollama models, use the following run command:
+# docker run --rm --name streamlit-app -p 8501:8501 --env-file .env -v C:/Users/YourUser/.ollama/models:/root/.ollama/models streamlit-chatbot
+
+# Running any of the `docker run` commands above will do the following:
 # Bind your host's port 8501 to the container’s port 8501
 # Inject your .env variables at runtime
 # Automatically remove the container after you stop it
